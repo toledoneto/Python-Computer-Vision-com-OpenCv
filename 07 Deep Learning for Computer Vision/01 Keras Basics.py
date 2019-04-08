@@ -1,6 +1,5 @@
 # vamos criar uma IA para identificar se a nota é falsa ou verdadeira
 
-import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, classification_report
 from numpy import genfromtxt
