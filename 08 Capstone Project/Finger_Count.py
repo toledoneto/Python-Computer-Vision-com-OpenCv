@@ -12,12 +12,14 @@ background = None
 accumulated_weight = 0.5
 
 # escolha manual do ROI para se colocar a mão a fim de detectar
+# no vídeo, será representado como um retângulo vermelho onde a mão deverá ficar
 roi_top = 20
 roi_bottom = 300
 roi_right = 300
 roi_left = 600
 
 
+#############################################################
 # Valor médio do fundo da img
 def calc_accum_avg(frame, accumulated_weight):
     '''
@@ -32,10 +34,13 @@ def calc_accum_avg(frame, accumulated_weight):
         background = frame.copy().astype("float")
         return None
 
-    # computa o peso, acumula e atualiza o bg
+    # computa o peso, acumula e atualiza o bg: acumula o peso de acordo com a media móvel
     cv2.accumulateWeighted(frame, background, accumulated_weight)
 
+    # essa função não retorna nada se tiver bg, apenas modifica o valor da var global background
 
+
+#############################################################
 # segmenta a mão
 def segment(frame, threshold=25):
     global background
@@ -54,7 +59,7 @@ def segment(frame, threshold=25):
     if len(contours) == 0:
         return None
     else:
-        # pelo jeito que foi feito o programa, a maior área externa é o contorno da mão
+        # pelo jeito que foi feito o algoritmo, a maior área externa é o contorno da mão
         hand_segment = max(contours, key=cv2.contourArea)
         
         # retorno da mão e da img após o th
@@ -63,6 +68,7 @@ def segment(frame, threshold=25):
 
 #############################################################
 # Contando os dedos com Convex Hull
+# Convex Hull: desenha um polígono nos pontos mais externos de um frame
 def count_fingers(thresholded, hand_segment):
 
     # fazendo o Convex Hull
@@ -75,21 +81,24 @@ def count_fingers(thresholded, hand_segment):
     right = tuple(conv_hull[conv_hull[:, :, 0].argmax()][0])
 
     # assumindo que o "meio" da mão está no cruzamento das linhas topo-baixo + esq-dir
-    # esses serão os ptos centrais
+    # esses serão os ptos centrais. Dois / força o retorno de um int
     cX = (left[0] + right[0]) // 2
     cY = (top[1] + bottom[1]) // 2
     
     # calculando a > dist entre o centro da mão e os pontos mais extremos
+    # provavelmente será o seu polegar
     distance = pairwise.euclidean_distances([(cX, cY)], Y=[left, right, top, bottom])[0]
     
     # pega a > dist
     max_distance = distance.max()
     
-    # cria um círculo com 90% da > dist
+    # cria um círculo com 80% da > dist
+    # qualquer objeto que estiver próx à borda do círculo, até msm fora, provavelmente será um dedo levantado
     radius = int(0.8 * max_distance)
     circumference = (2 * np.pi * radius)
 
     # pega um ROI que engloba apenas esse círculo
+    # shape[:2] para pegarmos apenas o (x, y), os canais de cores não interessam
     circular_roi = np.zeros(thresholded.shape[:2], dtype="uint8")
     
     # desenha o ROI
@@ -107,7 +116,7 @@ def count_fingers(thresholded, hand_segment):
     # tentativa de contar os dedos
     for cnt in contours:
         
-        # Bounding box of countour
+        # Bounding box dos contornos
         (x, y, w, h) = cv2.boundingRect(cnt)
 
         # para contarmos os dedos, temos duas condições
@@ -166,13 +175,13 @@ while True:
             thresholded, hand_segment = hand
 
             # Desenhando contorno ao redor da mão
-            cv2.drawContours(frame_copy, [hand_segment + (roi_right, roi_top)], -1, (255, 0, 0),1)
+            cv2.drawContours(frame_copy, [hand_segment + (roi_right, roi_top)], -1, (255, 0, 0), 1)
 
             # contando os dedos
             fingers = count_fingers(thresholded, hand_segment)
 
             # mostrando a contagem
-            cv2.putText(frame_copy, str(fingers), (70, 45), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2)
+            cv2.putText(frame_copy, str(fingers), (70, 45), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
             # mostrando a img pós th
             cv2.imshow("Thesholded", thresholded)
